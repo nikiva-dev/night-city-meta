@@ -6,17 +6,37 @@ Public **Cyberpunk TCG meta** dashboard for Night City Showdowns: tier list, mat
 
 Local clone (canonical): `C:\Users\Nikola\Desktop\night-city-meta`
 
-## Weekly refresh
+## Weekly refresh (SEO-safe)
 
-After the week's dashboard is rebuilt, from this folder:
+The generator writes a fresh `dashboard.html` without the published SEO head. **Always publish through `tools/publish.ps1`**, which copies the file and re-applies SEO before commit/push.
+
+From this folder:
 
 ```powershell
-Copy-Item -Force "C:\Users\Nikola\Desktop\CyberpunkTCG\WTNC\<week>\world_meta\cumulative\dashboard.html" .\index.html
-git add index.html
-git commit -m "Update world dashboard"
-git push
+.\tools\publish.ps1 -WeekDir "C:\Users\Nikola\Desktop\CyberpunkTCG\WTNC\<week>"
 ```
 
-Replace `<week>` with the current folder, for example `WTNC_w2_2026-11-21`. The Pages URL stays the same.
+Replace `<week>` with the current folder, for example `WTNC_w2_2026-11-21`.
 
-After copying a fresh `dashboard.html`, re-apply the SEO `<head>` / H1 / overall title strings from this repo (or merge carefully) so the Cyberpunk TCG meta title and meta tags are not overwritten.
+Or pass the dashboard path directly:
+
+```powershell
+.\tools\publish.ps1 -Dashboard "C:\Users\Nikola\Desktop\CyberpunkTCG\WTNC\<week>\world_meta\cumulative\dashboard.html"
+```
+
+Useful flags: `-SkipCommit`, `-SkipPush`.
+
+### What protects the SEO
+
+1. **`seo/head.fragment.html`** — canonical title, description, canonical URL, Open Graph, Twitter, JSON-LD.
+2. **`tools/ensure_seo.py`** — injects that fragment into `index.html`, sets `#page-title` / overall view title to `Cyberpunk TCG Meta`, and keeps `robots.txt` / `sitemap.xml`.
+3. **`tools/publish.ps1`** — copy dashboard → run ensure_seo → commit/push.
+4. **GitHub Action** `.github/workflows/ensure-seo.yml` — if someone copies `dashboard.html` over `index.html` and pushes without the script, CI restores SEO on `main` automatically.
+
+Do **not** use a bare `Copy-Item … dashboard.html .\index.html` + push anymore; that is what wiped the head before.
+
+Manual one-off restore:
+
+```powershell
+python tools\ensure_seo.py
+```
