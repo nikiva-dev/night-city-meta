@@ -4,14 +4,11 @@
 # Or pass the dashboard file directly:
 #   .\tools\publish.ps1 -Dashboard "C:\Users\Nikola\Desktop\CyberpunkTCG\WTNC\...\cumulative\dashboard.html"
 
-[CmdletBinding()]
+# No [CmdletBinding()]: PS 5.1 AmbiguousParameterSet on week folders whose
+# names end in a date (WTNC_w2_2026-11-21) when advanced param binding is on.
 param(
-    [Parameter(Mandatory = $false)]
     [string]$WeekDir,
-
-    [Parameter(Mandatory = $false)]
     [string]$Dashboard,
-
     [switch]$SkipCommit,
     [switch]$SkipPush
 )
@@ -31,8 +28,23 @@ if (-not (Test-Path -LiteralPath $Dashboard)) {
     throw "Dashboard not found: $Dashboard"
 }
 
+# -LiteralPath + -Parent AmbiguousParameterSet on dated week paths in PS 5.1.
+$CumDir = Split-Path -Path $Dashboard -Parent
 Write-Host "Copying dashboard -> index.html"
 Copy-Item -LiteralPath $Dashboard -Destination (Join-Path $RepoRoot "index.html") -Force
+
+# Multi-file live site: shell + assets/ + data/ + panels/ beside index.html.
+foreach ($name in @("assets", "data", "panels")) {
+    $src = Join-Path $CumDir $name
+    $dst = Join-Path $RepoRoot $name
+    if (Test-Path -LiteralPath $dst) {
+        Remove-Item -LiteralPath $dst -Recurse -Force
+    }
+    if (Test-Path -LiteralPath $src) {
+        Write-Host "Copying $name/"
+        Copy-Item -LiteralPath $src -Destination $dst -Recurse -Force
+    }
+}
 
 $py = Get-Command python -ErrorAction SilentlyContinue
 if (-not $py) { $py = Get-Command python3 -ErrorAction SilentlyContinue }
@@ -47,8 +59,8 @@ if ($SkipCommit) {
     exit 0
 }
 
-git add -- index.html robots.txt sitemap.xml
-$status = git status --porcelain -- index.html robots.txt sitemap.xml
+git add -- index.html robots.txt sitemap.xml assets data panels
+$status = git status --porcelain -- index.html robots.txt sitemap.xml assets data panels
 if (-not $status) {
     Write-Host "No file changes to commit."
     exit 0
